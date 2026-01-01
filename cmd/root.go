@@ -2,13 +2,16 @@ package cmd
 
 import (
 	"fmt"
+	"math"
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/user/git-seek/internal/embedding"
 	"github.com/user/git-seek/internal/git"
 )
 
 var debugFlag bool
+var embedTestFlag bool
 
 var rootCmd = &cobra.Command{
 	Use:   "git-seek [query]",
@@ -23,6 +26,11 @@ Examples:
 	Run: func(cmd *cobra.Command, args []string) {
 		if debugFlag {
 			runDebug()
+			return
+		}
+
+		if embedTestFlag {
+			runEmbedTest()
 			return
 		}
 
@@ -45,6 +53,7 @@ func Execute() {
 
 func init() {
 	rootCmd.Flags().BoolVar(&debugFlag, "debug", false, "Debug mode: show commit extraction info")
+	rootCmd.Flags().BoolVar(&embedTestFlag, "embed-test", false, "Test embedding generation")
 }
 
 func runDebug() {
@@ -97,4 +106,68 @@ func runDebug() {
 	if len(commits) > limit {
 		fmt.Printf("... and %d more commits\n", len(commits)-limit)
 	}
+}
+
+func runEmbedTest() {
+	fmt.Println("Initializing MiniLM embedder...")
+
+	embedder, err := embedding.NewMiniLMEmbedder()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating embedder: %v\n", err)
+		os.Exit(1)
+	}
+	defer embedder.Close()
+
+	fmt.Printf("Model loaded (dimensions: %d)\n\n", embedder.Dimensions())
+
+	// Test with sample texts
+	samples := []string{
+		"Add authentication middleware",
+		"Fix login bug in user session",
+		"Update README documentation",
+		"Refactor database connection pool",
+	}
+
+	fmt.Println("Generating embeddings for sample texts:")
+	for _, text := range samples {
+		vec, err := embedder.Embed(text)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error embedding text: %v\n", err)
+			continue
+		}
+		fmt.Printf("\n  \"%s\"\n", text)
+		fmt.Printf("  Vector[0:5]: [%.4f, %.4f, %.4f, %.4f, %.4f]\n",
+			vec[0], vec[1], vec[2], vec[3], vec[4])
+	}
+
+	// Test similarity between related texts
+	fmt.Println("\n─────────────────────────────────────────")
+	fmt.Println("Testing similarity (related vs unrelated):")
+
+	vec1, _ := embedder.Embed("Fix authentication bug")
+	vec2, _ := embedder.Embed("Fix login issue")
+	vec3, _ := embedder.Embed("Update documentation")
+
+	sim12 := cosineSimilarity(vec1, vec2)
+	sim13 := cosineSimilarity(vec1, vec3)
+
+	fmt.Printf("\n  \"Fix authentication bug\" vs \"Fix login issue\": %.4f\n", sim12)
+	fmt.Printf("  \"Fix authentication bug\" vs \"Update documentation\": %.4f\n", sim13)
+}
+
+func cosineSimilarity(a, b []float32) float32 {
+	var dot, normA, normB float32
+	for i := range a {
+		dot += a[i] * b[i]
+		normA += a[i] * a[i]
+		normB += b[i] * b[i]
+	}
+	if normA == 0 || normB == 0 {
+		return 0
+	}
+	return dot / (sqrt(normA) * sqrt(normB))
+}
+
+func sqrt(x float32) float32 {
+	return float32(math.Sqrt(float64(x)))
 }
