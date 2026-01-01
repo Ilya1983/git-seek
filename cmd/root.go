@@ -8,10 +8,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/user/git-seek/internal/embedding"
 	"github.com/user/git-seek/internal/git"
+	"github.com/user/git-seek/internal/store"
 )
 
 var debugFlag bool
 var embedTestFlag bool
+var storeTestFlag bool
 
 var rootCmd = &cobra.Command{
 	Use:   "git-seek [query]",
@@ -31,6 +33,11 @@ Examples:
 
 		if embedTestFlag {
 			runEmbedTest()
+			return
+		}
+
+		if storeTestFlag {
+			runStoreTest()
 			return
 		}
 
@@ -54,6 +61,7 @@ func Execute() {
 func init() {
 	rootCmd.Flags().BoolVar(&debugFlag, "debug", false, "Debug mode: show commit extraction info")
 	rootCmd.Flags().BoolVar(&embedTestFlag, "embed-test", false, "Test embedding generation")
+	rootCmd.Flags().BoolVar(&storeTestFlag, "store-test", false, "Test vector storage and search")
 }
 
 func runDebug() {
@@ -170,4 +178,92 @@ func cosineSimilarity(a, b []float32) float32 {
 
 func sqrt(x float32) float32 {
 	return float32(math.Sqrt(float64(x)))
+}
+
+func runStoreTest() {
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error getting current directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Initializing store...")
+	s, err := store.NewSQLiteStore(cwd)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating store: %v\n", err)
+		os.Exit(1)
+	}
+	defer s.Close()
+
+	fmt.Println("Initializing embedder...")
+	embedder, err := embedding.NewMiniLMEmbedder()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating embedder: %v\n", err)
+		os.Exit(1)
+	}
+	defer embedder.Close()
+
+	// Get commits from repo
+	fmt.Println("Fetching commits...")
+	repo, err := git.OpenRepository(cwd)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error opening repository: %v\n", err)
+		os.Exit(1)
+	}
+
+	commits, err := git.GetAllCommits(repo)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error getting commits: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Found %d commits\n", len(commits))
+
+	// Generate embeddings
+	fmt.Println("Generating embeddings...")
+	messages := make([]string, len(commits))
+	for i, c := range commits {
+		messages[i] = c.Message
+	}
+
+	embeddings, err := embedder.EmbedBatch(messages)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error generating embeddings: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Save to store
+	fmt.Println("Saving to store...")
+	err = s.SaveBatch(commits, embeddings)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error saving to store: %v\n", err)
+		os.Exit(1)
+	}
+
+	count, _ := s.Count()
+	fmt.Printf("Stored %d commits\n\n", count)
+
+	// Test search
+	fmt.Println("─────────────────────────────────────────")
+	fmt.Println("Testing search...")
+
+	query := "initial setup"
+	fmt.Printf("Query: \"%s\"\n\n", query)
+
+	queryVec, err := embedder.Embed(query)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error embedding query: %v\n", err)
+		os.Exit(1)
+	}
+
+	results, err := s.Search(queryVec, 5)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error searching: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Found %d results:\n\n", len(results))
+	for _, r := range results {
+		fmt.Printf("  %.4f  %s  %s\n", r.Score, r.Commit.Hash, r.Commit.Message)
+	}
 }
