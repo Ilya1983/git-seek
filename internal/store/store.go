@@ -1,6 +1,19 @@
 package store
 
-import "github.com/user/git-seek/internal/git"
+import (
+	"time"
+
+	"github.com/user/git-seek/internal/git"
+)
+
+// SearchFilters contains optional filters for search queries.
+type SearchFilters struct {
+	Author string    // Substring match on author name or email
+	Since  time.Time // Commits after this date (zero = no filter)
+	Until  time.Time // Commits before this date (zero = no filter)
+	Path   string    // Glob pattern for file paths
+	Branch string    // Exact match on branch name
+}
 
 // SearchResult represents a search match with similarity score.
 type SearchResult struct {
@@ -17,7 +30,8 @@ type Store interface {
 	SaveBatch(commits []git.Commit, embeddings [][]float32) error
 
 	// Search finds commits similar to the query vector, ordered by similarity.
-	Search(queryVec []float32, limit int) ([]SearchResult, error)
+	// Filters are applied to narrow results before similarity ranking.
+	Search(queryVec []float32, limit int, filters SearchFilters) ([]SearchResult, error)
 
 	// GetLastIndexedCommit returns the most recent indexed commit hash.
 	GetLastIndexedCommit() (string, error)

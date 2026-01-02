@@ -119,11 +119,28 @@ func (s *SQLiteStore) SaveBatch(commits []git.Commit, embeddings [][]float32) er
 }
 
 // Search finds commits similar to the query vector, ordered by similarity.
-func (s *SQLiteStore) Search(queryVec []float32, limit int) ([]SearchResult, error) {
-	rows, err := s.db.Query(`
-		SELECT hash, message, author, author_email, date, files, branches, embedding
-		FROM commits
-	`)
+// Filters are applied via SQL WHERE clauses (author, since, until) and
+// post-filtering (path glob) to narrow results.
+func (s *SQLiteStore) Search(queryVec []float32, limit int, filters SearchFilters) ([]SearchResult, error) {
+	// Build dynamic query with filters
+	query := `SELECT hash, message, author, author_email, date, files, branches, embedding FROM commits WHERE 1=1`
+	args := []interface{}{}
+
+	if filters.Author != "" {
+		query += ` AND (author LIKE ? OR author_email LIKE ?)`
+		pattern := "%" + filters.Author + "%"
+		args = append(args, pattern, pattern)
+	}
+	if !filters.Since.IsZero() {
+		query += ` AND date >= ?`
+		args = append(args, filters.Since.Unix())
+	}
+	if !filters.Until.IsZero() {
+		query += ` AND date <= ?`
+		args = append(args, filters.Until.Unix())
+	}
+
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -173,6 +190,34 @@ func (s *SQLiteStore) Search(queryVec []float32, limit int) ([]SearchResult, err
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Score > results[j].Score
 	})
+
+	// Post-filter by path glob (after sort, before limit)
+	if filters.Path != "" {
+		var filtered []SearchResult
+		for _, r := range results {
+			for _, file := range r.Commit.Files {
+				if matched, _ := filepath.Match(filters.Path, file); matched {
+					filtered = append(filtered, r)
+					break
+				}
+			}
+		}
+		results = filtered
+	}
+
+	// Post-filter by branch (exact match)
+	if filters.Branch != "" {
+		var filtered []SearchResult
+		for _, r := range results {
+			for _, branch := range r.Commit.Branches {
+				if branch == filters.Branch {
+					filtered = append(filtered, r)
+					break
+				}
+			}
+		}
+		results = filtered
+	}
 
 	// Limit results
 	if limit > 0 && len(results) > limit {

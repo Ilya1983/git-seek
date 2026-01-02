@@ -27,6 +27,13 @@ var limitFlag int
 var jsonFlag bool
 var shortFlag bool
 
+// Filter flags
+var authorFilter string
+var sinceFilter string
+var untilFilter string
+var pathFilter string
+var branchFilter string
+
 // appContext holds initialized components for commands
 type appContext struct {
 	cwd      string
@@ -146,6 +153,13 @@ func init() {
 	rootCmd.Flags().IntVarP(&limitFlag, "limit", "n", 10, "Maximum number of results")
 	rootCmd.Flags().BoolVar(&jsonFlag, "json", false, "Output results as JSON")
 	rootCmd.Flags().BoolVar(&shortFlag, "short", false, "Output only commit hashes")
+
+	// Filter flags
+	rootCmd.Flags().StringVar(&authorFilter, "author", "", "Filter by author name or email")
+	rootCmd.Flags().StringVar(&sinceFilter, "since", "", "Show commits after date (YYYY-MM-DD)")
+	rootCmd.Flags().StringVar(&untilFilter, "until", "", "Show commits before date (YYYY-MM-DD)")
+	rootCmd.Flags().StringVar(&pathFilter, "path", "", "Filter by file path (glob pattern)")
+	rootCmd.Flags().StringVar(&branchFilter, "branch", "", "Filter by branch name")
 }
 
 func runDebug() {
@@ -323,7 +337,7 @@ func runStoreTest() {
 		os.Exit(1)
 	}
 
-	results, err := s.Search(queryVec, 5)
+	results, err := s.Search(queryVec, 5, store.SearchFilters{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error searching: %v\n", err)
 		os.Exit(1)
@@ -419,6 +433,21 @@ func runIndex() error {
 	return nil
 }
 
+// parseDate parses a date string in common formats.
+func parseDate(s string) (time.Time, error) {
+	formats := []string{
+		"2006-01-02",
+		"2006-01-02T15:04:05Z",
+		time.RFC3339,
+	}
+	for _, f := range formats {
+		if t, err := time.Parse(f, s); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("invalid date format: %s (use YYYY-MM-DD)", s)
+}
+
 func runSearch(query string) error {
 	start := time.Now()
 
@@ -440,8 +469,27 @@ func runSearch(query string) error {
 		return fmt.Errorf("embedding query: %w", err)
 	}
 
+	// Build filters
+	filters := store.SearchFilters{
+		Author: authorFilter,
+		Path:   pathFilter,
+		Branch: branchFilter,
+	}
+	if sinceFilter != "" {
+		filters.Since, err = parseDate(sinceFilter)
+		if err != nil {
+			return err
+		}
+	}
+	if untilFilter != "" {
+		filters.Until, err = parseDate(untilFilter)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Search
-	results, err := ctx.store.Search(queryVec, limitFlag)
+	results, err := ctx.store.Search(queryVec, limitFlag, filters)
 	if err != nil {
 		return fmt.Errorf("searching: %w", err)
 	}
