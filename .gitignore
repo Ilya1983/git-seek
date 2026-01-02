@@ -9,7 +9,11 @@
 *.dylib
 git-seek
 
-# ONNX Runtime (downloaded during build)
+# Build dependencies and artifacts (created by Makefile/build.ps1)
+deps/
+dist/
+
+# Legacy ONNX Runtime location (before Makefile)
 onnxruntime-linux-x64-*/
 
 # Model file (downloaded during build, 87MB)
