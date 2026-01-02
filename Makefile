@@ -36,6 +36,10 @@ ORT_SHA256_linux-aarch64 :=
 ORT_SHA256_osx-x86_64 :=
 ORT_SHA256_osx-arm64 :=
 
+# Model settings (all-MiniLM-L6-v2 for embeddings)
+MODEL_URL := https://media.githubusercontent.com/media/clems4ever/all-minilm-l6-v2-go/main/all_minilm_l6_v2/model.onnx
+MODEL_FILE := patches/all-minilm-l6-v2-go/all_minilm_l6_v2/model.onnx
+
 # Directory structure
 DEPS_DIR := deps
 ORT_DIR := $(DEPS_DIR)/onnxruntime
@@ -180,8 +184,15 @@ endif
 	@rm -f $(ORT_DIR)/$(ORT_ARCHIVE)
 	@echo "ONNX Runtime installed to $(ORT_DOWNLOAD_DIR)"
 
+# Download embedding model (required for semantic search)
+$(MODEL_FILE):
+	@echo "Downloading all-MiniLM-L6-v2 model (~90MB)..."
+	@mkdir -p $(dir $(MODEL_FILE))
+	@curl -fsSL --progress-bar -o $(MODEL_FILE) $(MODEL_URL)
+	@echo "Model downloaded to $(MODEL_FILE)"
+
 .PHONY: setup check-deps
-setup: $(ORT_LIB_FILE) ## Download ONNX Runtime for current platform
+setup: $(ORT_LIB_FILE) $(MODEL_FILE) ## Download ONNX Runtime and model for current platform
 	@echo ""
 	@echo "Setup complete!"
 	@echo "ONNX Runtime $(ORT_VERSION) for $(ORT_PLATFORM) is ready."
@@ -192,15 +203,21 @@ check-deps: ## Check if dependencies are installed
 		echo "Run 'make setup' to download dependencies"; \
 		exit 1; \
 	fi
+	@if [ ! -f "$(MODEL_FILE)" ]; then \
+		echo "Error: Model not found at $(MODEL_FILE)"; \
+		echo "Run 'make setup' to download dependencies"; \
+		exit 1; \
+	fi
 	@echo "Dependencies OK"
 	@echo "  ONNX Runtime: $(ORT_VERSION) ($(ORT_PLATFORM))"
+	@echo "  Model: all-MiniLM-L6-v2"
 
 #==============================================================================
 # Build
 #==============================================================================
 
 .PHONY: build build-only
-build: $(ORT_LIB_FILE) build-only ## Build the binary (downloads deps if needed)
+build: $(ORT_LIB_FILE) $(MODEL_FILE) build-only ## Build the binary (downloads deps if needed)
 
 build-only: ## Build the binary (assumes deps exist)
 	@echo "Building $(PROJECT_NAME) $(VERSION)..."

@@ -95,6 +95,10 @@ $ORT_LIB_DIR = "$ORT_DOWNLOAD_DIR\lib"
 $ORT_LIB_FILE = "$ORT_LIB_DIR\onnxruntime.dll"
 $DIST_DIR = "dist"
 
+# Model settings (all-MiniLM-L6-v2 for embeddings)
+$MODEL_URL = "https://media.githubusercontent.com/media/clems4ever/all-minilm-l6-v2-go/main/all_minilm_l6_v2/model.onnx"
+$MODEL_FILE = "patches\all-minilm-l6-v2-go\all_minilm_l6_v2\model.onnx"
+
 # Build output
 $BINARY = "$PROJECT_NAME.exe"
 
@@ -122,7 +126,35 @@ function Test-Dependencies {
     if (-not (Test-Path $ORT_LIB_FILE)) {
         return $false
     }
+    if (-not (Test-Path $MODEL_FILE)) {
+        return $false
+    }
     return $true
+}
+
+function Download-Model {
+    if (Test-Path $MODEL_FILE) {
+        Write-Info "Model already exists at $MODEL_FILE"
+        return
+    }
+
+    Write-Host "Downloading all-MiniLM-L6-v2 model (~90MB)..."
+    $modelDir = Split-Path $MODEL_FILE -Parent
+    if (-not (Test-Path $modelDir)) {
+        New-Item -ItemType Directory -Path $modelDir -Force | Out-Null
+    }
+
+    try {
+        $ProgressPreference = 'SilentlyContinue'
+        Invoke-WebRequest -Uri $MODEL_URL -OutFile $MODEL_FILE -UseBasicParsing
+        $ProgressPreference = 'Continue'
+    }
+    catch {
+        Write-Error "Failed to download model: $_"
+        exit 1
+    }
+
+    Write-Success "Model downloaded to $MODEL_FILE"
 }
 
 #==============================================================================
@@ -206,6 +238,9 @@ function Invoke-Setup {
     }
 
     Write-Success "ONNX Runtime installed to $ORT_DOWNLOAD_DIR"
+
+    # Download embedding model
+    Download-Model
 }
 
 function Invoke-Build {
