@@ -6,6 +6,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing/storer"
 )
 
 // Commit represents a git commit with its metadata.
@@ -54,6 +55,63 @@ func GetAllCommits(repo *git.Repository) ([]Commit, error) {
 		hash := c.Hash.String()
 		commit := Commit{
 			Hash:        hash[:7], // Short hash
+			Message:     firstLine(c.Message),
+			Author:      c.Author.Name,
+			AuthorEmail: c.Author.Email,
+			Date:        c.Author.When,
+			Files:       files,
+			Branches:    branchMap[c.Hash],
+		}
+
+		commits = append(commits, commit)
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return commits, nil
+}
+
+// GetCommitsSince retrieves commits newer than the given hash.
+// Returns commits in reverse chronological order (newest first).
+// If sinceHash is not found, returns all commits.
+func GetCommitsSince(repo *git.Repository, sinceHash string) ([]Commit, error) {
+	// Build a map of commit hash -> branches for quick lookup
+	branchMap, err := buildBranchMap(repo)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get commit iterator
+	commitIter, err := repo.Log(&git.LogOptions{
+		Order: git.LogOrderCommitterTime,
+		All:   true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer commitIter.Close()
+
+	var commits []Commit
+
+	err = commitIter.ForEach(func(c *object.Commit) error {
+		hash := c.Hash.String()
+		shortHash := hash[:7]
+
+		// Stop when we reach the already-indexed commit
+		if shortHash == sinceHash || hash == sinceHash {
+			return storer.ErrStop
+		}
+
+		files, err := getCommitFiles(c)
+		if err != nil {
+			files = []string{}
+		}
+
+		commit := Commit{
+			Hash:        shortHash,
 			Message:     firstLine(c.Message),
 			Author:      c.Author.Name,
 			AuthorEmail: c.Author.Email,

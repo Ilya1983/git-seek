@@ -32,6 +32,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/schollz/progressbar/v2 v2.15.0 // indirect
+	github.com/schollz/progressbar/v3 v3.19.0 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/skeema/knownhosts v1.2.2 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
@@ -45,6 +46,7 @@ require (
 	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
+	golang.org/x/term v0.34.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/tools v0.36.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
