@@ -79,9 +79,17 @@ func (s *SQLiteStore) SaveBatch(commits []git.Commit, embeddings [][]float32) er
 
 	tx, err := s.db.Begin()
 	if err != nil {
-		return err
+		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+
+	committed := false
+	defer func() {
+		if !committed {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				fmt.Fprintf(os.Stderr, "warning: rollback failed: %v\n", rbErr)
+			}
+		}
+	}()
 
 	stmt, err := tx.Prepare(`
 		INSERT OR REPLACE INTO commits
@@ -95,11 +103,17 @@ func (s *SQLiteStore) SaveBatch(commits []git.Commit, embeddings [][]float32) er
 
 	now := time.Now().Unix()
 	for i, commit := range commits {
-		filesJSON, _ := json.Marshal(commit.Files)
-		branchesJSON, _ := json.Marshal(commit.Branches)
+		filesJSON, err := json.Marshal(commit.Files)
+		if err != nil {
+			return fmt.Errorf("marshal files for %s: %w", commit.Hash, err)
+		}
+		branchesJSON, err := json.Marshal(commit.Branches)
+		if err != nil {
+			return fmt.Errorf("marshal branches for %s: %w", commit.Hash, err)
+		}
 		embeddingBytes := embeddingToBytes(embeddings[i])
 
-		_, err := stmt.Exec(
+		_, err = stmt.Exec(
 			commit.Hash,
 			commit.Message,
 			commit.Author,
@@ -111,11 +125,15 @@ func (s *SQLiteStore) SaveBatch(commits []git.Commit, embeddings [][]float32) er
 			now,
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf("insert commit %s: %w", commit.Hash, err)
 		}
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	committed = true
+	return nil
 }
 
 // Search finds commits similar to the query vector, ordered by similarity.
@@ -158,14 +176,17 @@ func (s *SQLiteStore) Search(queryVec []float32, limit int, filters SearchFilter
 
 		err := rows.Scan(&hash, &message, &author, &authorEmail, &dateUnix, &filesJSON, &branchesJSON, &embeddingBytes)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to scan row: %v\n", err)
 			continue
 		}
 
 		var files, branches []string
 		if err := json.Unmarshal([]byte(filesJSON), &files); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: corrupt files JSON for commit %s: %v\n", git.ShortenHash(hash), err)
 			files = []string{}
 		}
 		if err := json.Unmarshal([]byte(branchesJSON), &branches); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: corrupt branches JSON for commit %s: %v\n", git.ShortenHash(hash), err)
 			branches = []string{}
 		}
 
