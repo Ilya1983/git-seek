@@ -15,11 +15,26 @@ import (
 	"github.com/user/git-seek/internal/store"
 )
 
+// Version information (set via SetVersionInfo from main)
+var (
+	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
+)
+
+// SetVersionInfo sets version information from main package
+func SetVersionInfo(v, c, d string) {
+	version = v
+	commit = c
+	date = d
+}
+
 var debugFlag bool
 var embedTestFlag bool
 var storeTestFlag bool
 var indexFlag bool
 var statusFlag bool
+var versionFlag bool
 var batchSize int
 
 // Search flags
@@ -89,6 +104,11 @@ Examples:
   git-seek "authentication changes" --author=alice
   git-seek --index`,
 	Run: func(cmd *cobra.Command, args []string) {
+		if versionFlag {
+			fmt.Printf("git-seek %s (commit: %s, built: %s)\n", version, commit, date)
+			return
+		}
+
 		if debugFlag {
 			git.Debug = true
 			runDebug()
@@ -142,6 +162,7 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.Flags().BoolVar(&versionFlag, "version", false, "Show version information")
 	rootCmd.Flags().BoolVar(&debugFlag, "debug", false, "Debug mode: show commit extraction info")
 	rootCmd.Flags().BoolVar(&embedTestFlag, "embed-test", false, "Test embedding generation")
 	rootCmd.Flags().BoolVar(&storeTestFlag, "store-test", false, "Test vector storage and search")

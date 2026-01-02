@@ -61,6 +61,17 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Check for unsupported ARM64 Windows
+if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") {
+    Write-Host "ERROR: Windows ARM64 is not supported." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "ONNX Runtime does not provide ARM64 Windows builds."
+    Write-Host "Consider using WSL2 with the Linux ARM64 build instead:"
+    Write-Host "  wsl --install"
+    Write-Host "  # Then in WSL: make build"
+    exit 1
+}
+
 # Project metadata
 $PROJECT_NAME = "git-seek"
 $VERSION = try { git describe --tags --always --dirty 2>$null } catch { "dev" }
@@ -230,6 +241,13 @@ function Invoke-Build {
     Write-Host ""
     Write-Host "Then run:"
     Write-Host "  .\$BINARY --help"
+    Write-Host ""
+    Write-Host "To make permanent, add to your PowerShell profile:" -ForegroundColor Yellow
+    Write-Host "  notepad `$PROFILE"
+    Write-Host "  # Add the export lines above to the file"
+    Write-Host ""
+    Write-Host "Or set system environment variables via:"
+    Write-Host "  Control Panel > System > Advanced > Environment Variables"
 }
 
 function Invoke-Test {

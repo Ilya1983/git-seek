@@ -28,6 +28,14 @@ LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(GIT_COMMIT) -X main
 ORT_VERSION := 1.23.2
 ORT_BASE_URL := https://github.com/microsoft/onnxruntime/releases/download/v$(ORT_VERSION)
 
+# SHA256 checksums for ONNX Runtime archives (optional security verification)
+# To enable verification, set these to the actual checksums from the release
+# Leave empty to skip verification (with warning)
+ORT_SHA256_linux-x64 :=
+ORT_SHA256_linux-aarch64 :=
+ORT_SHA256_osx-x86_64 :=
+ORT_SHA256_osx-arm64 :=
+
 # Directory structure
 DEPS_DIR := deps
 ORT_DIR := $(DEPS_DIR)/onnxruntime
@@ -151,13 +159,25 @@ $(ORT_DIR): | $(DEPS_DIR)
 $(DIST_DIR):
 	@mkdir -p $@
 
+# Get checksum for current platform
+ORT_SHA256 := $(ORT_SHA256_$(ORT_PLATFORM))
+
 # Download and extract ONNX Runtime
 $(ORT_LIB_FILE): | $(ORT_DIR)
 	@echo "Downloading ONNX Runtime $(ORT_VERSION) for $(ORT_PLATFORM)..."
 	@mkdir -p $(ORT_DOWNLOAD_DIR)
-	@curl -fsSL --progress-bar $(ORT_URL) | tar -xz -C $(ORT_DIR)
+	@curl -fsSL --progress-bar -o $(ORT_DIR)/$(ORT_ARCHIVE) $(ORT_URL)
+ifneq ($(ORT_SHA256),)
+	@echo "Verifying checksum..."
+	@echo "$(ORT_SHA256)  $(ORT_DIR)/$(ORT_ARCHIVE)" | sha256sum -c - || \
+		(echo "ERROR: Checksum verification failed!" && rm -f $(ORT_DIR)/$(ORT_ARCHIVE) && exit 1)
+else
+	@echo "WARNING: Checksum verification skipped (no checksum configured)"
+endif
+	@tar -xzf $(ORT_DIR)/$(ORT_ARCHIVE) -C $(ORT_DIR)
 	@mv $(ORT_DIR)/onnxruntime-$(ORT_PLATFORM)-$(ORT_VERSION)/* $(ORT_DOWNLOAD_DIR)/
 	@rm -rf $(ORT_DIR)/onnxruntime-$(ORT_PLATFORM)-$(ORT_VERSION)
+	@rm -f $(ORT_DIR)/$(ORT_ARCHIVE)
 	@echo "ONNX Runtime installed to $(ORT_DOWNLOAD_DIR)"
 
 .PHONY: setup check-deps
@@ -335,16 +355,23 @@ release-local: build | $(DIST_DIR) ## Create release package for current platfor
 	@echo "" >> $(RELEASE_DIR)/README.md
 	@echo "## Quick Start" >> $(RELEASE_DIR)/README.md
 	@echo "" >> $(RELEASE_DIR)/README.md
+	@echo "Run these commands from the directory where you extracted the archive:" >> $(RELEASE_DIR)/README.md
+	@echo "" >> $(RELEASE_DIR)/README.md
 	@echo "\`\`\`bash" >> $(RELEASE_DIR)/README.md
 ifeq ($(HOST_OS),linux)
-	@echo "export LD_LIBRARY_PATH=\$$(pwd)/lib" >> $(RELEASE_DIR)/README.md
+	@echo "export LD_LIBRARY_PATH=\$$(pwd)/lib:\$$LD_LIBRARY_PATH" >> $(RELEASE_DIR)/README.md
 	@echo "export ONNXRUNTIME_LIB_PATH=\$$(pwd)/lib/libonnxruntime.so" >> $(RELEASE_DIR)/README.md
 else ifeq ($(HOST_OS),darwin)
-	@echo "export DYLD_LIBRARY_PATH=\$$(pwd)/lib" >> $(RELEASE_DIR)/README.md
+	@echo "export DYLD_LIBRARY_PATH=\$$(pwd)/lib:\$$DYLD_LIBRARY_PATH" >> $(RELEASE_DIR)/README.md
 	@echo "export ONNXRUNTIME_LIB_PATH=\$$(pwd)/lib/libonnxruntime.dylib" >> $(RELEASE_DIR)/README.md
 endif
 	@echo "./$(PROJECT_NAME) --help" >> $(RELEASE_DIR)/README.md
 	@echo "\`\`\`" >> $(RELEASE_DIR)/README.md
+	@echo "" >> $(RELEASE_DIR)/README.md
+	@echo "**Note:** If you move the binary to another location, update the paths accordingly" >> $(RELEASE_DIR)/README.md
+	@echo "or install to a system directory (e.g., copy lib/* to /usr/local/lib)." >> $(RELEASE_DIR)/README.md
+	@echo "" >> $(RELEASE_DIR)/README.md
+	@echo "**To make permanent:** Add the export commands to your shell profile (~/.bashrc or ~/.zshrc)." >> $(RELEASE_DIR)/README.md
 	@echo "" >> $(RELEASE_DIR)/README.md
 	@echo "## Usage" >> $(RELEASE_DIR)/README.md
 	@echo "" >> $(RELEASE_DIR)/README.md

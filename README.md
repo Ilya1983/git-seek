@@ -39,13 +39,14 @@ git-seek "database optimization" --author=alice --since=2024-01-01
 
 ### From Releases (Recommended)
 
-Download the latest release for your platform:
+Download the latest release for your platform from the [Releases page](https://github.com/Ilya1983/git-seek/releases).
 
 **Linux (x64):**
 ```bash
-curl -LO https://github.com/Ilya1983/git-seek/releases/latest/download/git-seek-linux-x64.tar.gz
-tar -xzf git-seek-linux-x64.tar.gz
-cd git-seek-linux-x64
+# Replace v1.0.0 with the latest version
+curl -LO https://github.com/Ilya1983/git-seek/releases/download/v1.0.0/git-seek-linux-x64-v1.0.0.tar.gz
+tar -xzf git-seek-linux-x64-v1.0.0.tar.gz
+cd git-seek-linux-x64-v1.0.0
 
 # Set environment (add to ~/.bashrc for persistence)
 export LD_LIBRARY_PATH=$(pwd)/lib:$LD_LIBRARY_PATH
@@ -56,9 +57,10 @@ export ONNXRUNTIME_LIB_PATH=$(pwd)/lib/libonnxruntime.so
 
 **macOS (Apple Silicon):**
 ```bash
-curl -LO https://github.com/Ilya1983/git-seek/releases/latest/download/git-seek-osx-arm64.tar.gz
-tar -xzf git-seek-osx-arm64.tar.gz
-cd git-seek-osx-arm64
+# Replace v1.0.0 with the latest version
+curl -LO https://github.com/Ilya1983/git-seek/releases/download/v1.0.0/git-seek-osx-arm64-v1.0.0.tar.gz
+tar -xzf git-seek-osx-arm64-v1.0.0.tar.gz
+cd git-seek-osx-arm64-v1.0.0
 
 # Set environment (add to ~/.zshrc for persistence)
 export DYLD_LIBRARY_PATH=$(pwd)/lib:$DYLD_LIBRARY_PATH
@@ -69,9 +71,10 @@ export ONNXRUNTIME_LIB_PATH=$(pwd)/lib/libonnxruntime.dylib
 
 **Windows (x64):**
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/Ilya1983/git-seek/releases/latest/download/git-seek-win-x64.zip" -OutFile "git-seek-win-x64.zip"
-Expand-Archive -Path "git-seek-win-x64.zip" -DestinationPath "."
-cd git-seek-win-x64
+# Replace v1.0.0 with the latest version
+Invoke-WebRequest -Uri "https://github.com/Ilya1983/git-seek/releases/download/v1.0.0/git-seek-win-x64-v1.0.0.zip" -OutFile "git-seek-win-x64-v1.0.0.zip"
+Expand-Archive -Path "git-seek-win-x64-v1.0.0.zip" -DestinationPath "."
+cd git-seek-win-x64-v1.0.0
 
 # Set environment (for current session)
 $env:PATH = "$(pwd)\lib;$env:PATH"
@@ -247,6 +250,7 @@ git-seek "changes" --limit=20  # Top 20 results
 
 | Flag | Description |
 |------|-------------|
+| `--version` | Show version information |
 | `--index` | Build or update the semantic index |
 | `--status` | Show index information |
 | `--author=<name>` | Filter by author name or email (substring) |
