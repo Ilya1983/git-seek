@@ -23,9 +23,9 @@ func bytesToEmbedding(data []byte) []float32 {
 	return vec
 }
 
-// cosineSimilarity computes the cosine similarity between two vectors.
+// CosineSimilarity computes the cosine similarity between two vectors.
 // Returns a value between -1.0 and 1.0, where 1.0 means identical direction.
-func cosineSimilarity(a, b []float32) float32 {
+func CosineSimilarity(a, b []float32) float32 {
 	if len(a) != len(b) {
 		return 0
 	}

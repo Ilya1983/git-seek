@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -84,6 +83,7 @@ Examples:
   git-seek --index`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if debugFlag {
+			git.Debug = true
 			runDebug()
 			return
 		}
@@ -182,7 +182,7 @@ func runDebug() {
 	for i := 0; i < limit; i++ {
 		c := commits[i]
 		fmt.Printf("─────────────────────────────────────────\n")
-		fmt.Printf("Hash:     %s\n", c.Hash)
+		fmt.Printf("Hash:     %s\n", c.ShortHash())
 		fmt.Printf("Author:   %s <%s>\n", c.Author, c.AuthorEmail)
 		fmt.Printf("Date:     %s\n", c.Date.Format("2006-01-02 15:04:05"))
 		fmt.Printf("Message:  %s\n", c.Message)
@@ -240,28 +240,11 @@ func runEmbedTest() {
 	vec2, _ := embedder.Embed("Fix login issue")
 	vec3, _ := embedder.Embed("Update documentation")
 
-	sim12 := cosineSimilarity(vec1, vec2)
-	sim13 := cosineSimilarity(vec1, vec3)
+	sim12 := store.CosineSimilarity(vec1, vec2)
+	sim13 := store.CosineSimilarity(vec1, vec3)
 
 	fmt.Printf("\n  \"Fix authentication bug\" vs \"Fix login issue\": %.4f\n", sim12)
 	fmt.Printf("  \"Fix authentication bug\" vs \"Update documentation\": %.4f\n", sim13)
-}
-
-func cosineSimilarity(a, b []float32) float32 {
-	var dot, normA, normB float32
-	for i := range a {
-		dot += a[i] * b[i]
-		normA += a[i] * a[i]
-		normB += b[i] * b[i]
-	}
-	if normA == 0 || normB == 0 {
-		return 0
-	}
-	return dot / (sqrt(normA) * sqrt(normB))
-}
-
-func sqrt(x float32) float32 {
-	return float32(math.Sqrt(float64(x)))
 }
 
 func runStoreTest() {
@@ -348,7 +331,7 @@ func runStoreTest() {
 
 	fmt.Printf("Found %d results:\n\n", len(results))
 	for _, r := range results {
-		fmt.Printf("  %.4f  %s  %s\n", r.Score, r.Commit.Hash, r.Commit.Message)
+		fmt.Printf("  %.4f  %s  %s\n", r.Score, r.Commit.ShortHash(), r.Commit.Message)
 	}
 }
 
@@ -468,7 +451,7 @@ func runSearch(query string) error {
 	// Output based on format
 	if shortFlag {
 		for _, r := range results {
-			fmt.Println(r.Commit.Hash)
+			fmt.Println(r.Commit.ShortHash())
 		}
 		return nil
 	}
@@ -500,7 +483,7 @@ func outputJSON(results []store.SearchResult) error {
 	output := make([]JSONResult, len(results))
 	for i, r := range results {
 		output[i] = JSONResult{
-			Hash:    r.Commit.Hash,
+			Hash:    r.Commit.ShortHash(),
 			Score:   r.Score,
 			Message: r.Commit.Message,
 			Author:  r.Commit.AuthorEmail,
@@ -515,7 +498,7 @@ func outputJSON(results []store.SearchResult) error {
 
 func printResult(r store.SearchResult) {
 	// Line 1: hash  score  message
-	fmt.Printf("%s  %.2f  %s\n", r.Commit.Hash, r.Score, r.Commit.Message)
+	fmt.Printf("%s  %.2f  %s\n", r.Commit.ShortHash(), r.Score, r.Commit.Message)
 
 	// Line 2: relative time · author
 	fmt.Printf("         %s · %s\n", relativeTime(r.Commit.Date), r.Commit.AuthorEmail)

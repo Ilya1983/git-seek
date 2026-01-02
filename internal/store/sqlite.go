@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -73,7 +74,7 @@ func (s *SQLiteStore) Save(commit git.Commit, embedding []float32) error {
 // SaveBatch stores multiple commits with embeddings efficiently.
 func (s *SQLiteStore) SaveBatch(commits []git.Commit, embeddings [][]float32) error {
 	if len(commits) != len(embeddings) {
-		return nil
+		return fmt.Errorf("mismatch: %d commits but %d embeddings", len(commits), len(embeddings))
 	}
 
 	tx, err := s.db.Begin()
@@ -144,11 +145,15 @@ func (s *SQLiteStore) Search(queryVec []float32, limit int) ([]SearchResult, err
 		}
 
 		var files, branches []string
-		json.Unmarshal([]byte(filesJSON), &files)
-		json.Unmarshal([]byte(branchesJSON), &branches)
+		if err := json.Unmarshal([]byte(filesJSON), &files); err != nil {
+			files = []string{}
+		}
+		if err := json.Unmarshal([]byte(branchesJSON), &branches); err != nil {
+			branches = []string{}
+		}
 
 		embedding := bytesToEmbedding(embeddingBytes)
-		score := cosineSimilarity(queryVec, embedding)
+		score := CosineSimilarity(queryVec, embedding)
 
 		results = append(results, SearchResult{
 			Commit: git.Commit{

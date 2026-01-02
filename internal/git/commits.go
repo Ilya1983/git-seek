@@ -1,6 +1,8 @@
 package git
 
 import (
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -9,15 +11,34 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/storer"
 )
 
+// Debug enables verbose logging for git operations.
+var Debug bool
+
+// ShortHashLength is the number of characters used for abbreviated commit hashes.
+const ShortHashLength = 7
+
+// ShortenHash returns the first ShortHashLength characters of a hash string.
+func ShortenHash(hash string) string {
+	if len(hash) >= ShortHashLength {
+		return hash[:ShortHashLength]
+	}
+	return hash
+}
+
 // Commit represents a git commit with its metadata.
 type Commit struct {
-	Hash        string
+	Hash        string // Full 40-character hash
 	Message     string
 	Author      string
 	AuthorEmail string
 	Date        time.Time
 	Files       []string
 	Branches    []string
+}
+
+// ShortHash returns the abbreviated commit hash for display.
+func (c Commit) ShortHash() string {
+	return ShortenHash(c.Hash)
 }
 
 // OpenRepository opens a git repository at the given path.
@@ -46,15 +67,17 @@ func GetAllCommits(repo *git.Repository) ([]Commit, error) {
 	var commits []Commit
 
 	err = commitIter.ForEach(func(c *object.Commit) error {
+		hash := c.Hash.String()
+
 		files, err := getCommitFiles(c)
 		if err != nil {
-			// Don't fail on file extraction errors, just skip files
+			if Debug {
+				fmt.Fprintf(os.Stderr, "Warning: failed to get files for %s: %v\n", ShortenHash(hash), err)
+			}
 			files = []string{}
 		}
-
-		hash := c.Hash.String()
 		commit := Commit{
-			Hash:        hash[:7], // Short hash
+			Hash:        hash, // Full hash
 			Message:     firstLine(c.Message),
 			Author:      c.Author.Name,
 			AuthorEmail: c.Author.Email,
@@ -98,7 +121,7 @@ func GetCommitsSince(repo *git.Repository, sinceHash string) ([]Commit, error) {
 
 	err = commitIter.ForEach(func(c *object.Commit) error {
 		hash := c.Hash.String()
-		shortHash := hash[:7]
+		shortHash := ShortenHash(hash)
 
 		// Stop when we reach the already-indexed commit
 		if shortHash == sinceHash || hash == sinceHash {
@@ -107,11 +130,14 @@ func GetCommitsSince(repo *git.Repository, sinceHash string) ([]Commit, error) {
 
 		files, err := getCommitFiles(c)
 		if err != nil {
+			if Debug {
+				fmt.Fprintf(os.Stderr, "Warning: failed to get files for %s: %v\n", shortHash, err)
+			}
 			files = []string{}
 		}
 
 		commit := Commit{
-			Hash:        shortHash,
+			Hash:        hash, // Full hash
 			Message:     firstLine(c.Message),
 			Author:      c.Author.Name,
 			AuthorEmail: c.Author.Email,
