@@ -263,6 +263,14 @@ git-seek "changes" --limit=20  # Top 20 results
 | `--short` | Output hashes only |
 | `--help` | Show help |
 
+**Developer/Debug Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--debug` | Show commit extraction info |
+| `--embed-test` | Test embedding model initialization and similarity |
+| `--store-test` | Test vector storage and search functionality |
+
 ## How It Works
 
 1. **Indexing**: git-seek walks through all commits and generates a 384-dimensional embedding vector for each commit message using the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model.
@@ -276,7 +284,38 @@ git-seek "changes" --limit=20  # Top 20 results
 **Key points:**
 - All processing is local - no API calls, no cloud services
 - The model runs via ONNX Runtime for fast inference
-- The model weights (~90MB) are embedded in the binary
+- The model weights (~90MB) are downloaded at build time and embedded in the binary
+
+## Project Structure
+
+```
+git-seek/
+├── cmd/
+│   ├── root.go           # CLI entry point and main commands
+│   └── devtools.go       # Developer testing utilities
+├── internal/
+│   ├── git/              # Git operations (commit walking, metadata)
+│   ├── embedding/        # Embedding generation interface
+│   └── store/            # Vector storage and similarity search
+├── patches/              # Patched dependencies (see below)
+├── Makefile              # Build automation (Linux/macOS)
+└── build.ps1             # Build automation (Windows)
+```
+
+### Why the `patches/` Directory Exists
+
+The `patches/all-minilm-l6-v2-go/` directory contains a patched version of the [clems4ever/all-minilm-l6-v2-go](https://github.com/clems4ever/all-minilm-l6-v2-go) package. This was necessary because:
+
+1. **API Incompatibility**: The upstream package calls `tokenizer.NewRawInputSequence()` which doesn't exist in the tokenizer library. The fix changes it to `tokenizer.NewInputSequence()`.
+
+2. **Git LFS Issue**: The upstream package stores `model.onnx` via Git LFS. When Go downloads the module, it gets a 133-byte LFS pointer file instead of the actual 90MB model, causing "protobuf parsing failed" errors.
+
+The patched package is referenced via a `replace` directive in `go.mod`:
+```go
+replace github.com/clems4ever/all-minilm-l6-v2-go => ./patches/all-minilm-l6-v2-go
+```
+
+The model file itself is **not** stored in git - it's downloaded during build with SHA256 checksum verification.
 
 ## Performance
 
