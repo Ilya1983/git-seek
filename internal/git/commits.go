@@ -46,12 +46,15 @@ func OpenRepository(path string) (*git.Repository, error) {
 	return git.PlainOpen(path)
 }
 
-// GetAllCommits retrieves all commits from the repository.
-func GetAllCommits(repo *git.Repository) ([]Commit, error) {
+// GetCommits retrieves commits from the repository.
+// If sinceHash is empty, returns all commits.
+// If sinceHash is provided, returns only commits newer than that hash.
+// Returns commits in reverse chronological order (newest first).
+func GetCommits(repo *git.Repository, sinceHash string) ([]Commit, error) {
 	// Build a map of commit hash -> branches for quick lookup
 	branchMap, err := buildBranchMap(repo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("building branch map: %w", err)
 	}
 
 	// Get commit iterator starting from HEAD
@@ -60,60 +63,7 @@ func GetAllCommits(repo *git.Repository) ([]Commit, error) {
 		All:   true,
 	})
 	if err != nil {
-		return nil, err
-	}
-	defer commitIter.Close()
-
-	var commits []Commit
-
-	err = commitIter.ForEach(func(c *object.Commit) error {
-		hash := c.Hash.String()
-
-		files, err := getCommitFiles(c)
-		if err != nil {
-			if Debug {
-				fmt.Fprintf(os.Stderr, "Warning: failed to get files for %s: %v\n", ShortenHash(hash), err)
-			}
-			files = []string{}
-		}
-		commit := Commit{
-			Hash:        hash, // Full hash
-			Message:     firstLine(c.Message),
-			Author:      c.Author.Name,
-			AuthorEmail: c.Author.Email,
-			Date:        c.Author.When,
-			Files:       files,
-			Branches:    branchMap[c.Hash],
-		}
-
-		commits = append(commits, commit)
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return commits, nil
-}
-
-// GetCommitsSince retrieves commits newer than the given hash.
-// Returns commits in reverse chronological order (newest first).
-// If sinceHash is not found, returns all commits.
-func GetCommitsSince(repo *git.Repository, sinceHash string) ([]Commit, error) {
-	// Build a map of commit hash -> branches for quick lookup
-	branchMap, err := buildBranchMap(repo)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get commit iterator
-	commitIter, err := repo.Log(&git.LogOptions{
-		Order: git.LogOrderCommitterTime,
-		All:   true,
-	})
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading git log: %w", err)
 	}
 	defer commitIter.Close()
 
@@ -123,8 +73,8 @@ func GetCommitsSince(repo *git.Repository, sinceHash string) ([]Commit, error) {
 		hash := c.Hash.String()
 		shortHash := ShortenHash(hash)
 
-		// Stop when we reach the already-indexed commit
-		if shortHash == sinceHash || hash == sinceHash {
+		// Stop when we reach the already-indexed commit (if sinceHash provided)
+		if sinceHash != "" && (shortHash == sinceHash || hash == sinceHash) {
 			return storer.ErrStop
 		}
 
@@ -151,7 +101,7 @@ func GetCommitsSince(repo *git.Repository, sinceHash string) ([]Commit, error) {
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("iterating commits: %w", err)
 	}
 
 	return commits, nil
@@ -164,7 +114,7 @@ func buildBranchMap(repo *git.Repository) (map[plumbing.Hash][]string, error) {
 	// Get all branches
 	branchIter, err := repo.Branches()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading branches: %w", err)
 	}
 	defer branchIter.Close()
 
@@ -179,7 +129,7 @@ func buildBranchMap(repo *git.Repository) (map[plumbing.Hash][]string, error) {
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("iterating branches: %w", err)
 	}
 
 	return branchMap, nil
@@ -192,7 +142,7 @@ func getCommitFiles(c *object.Commit) ([]string, error) {
 	// Get the tree for this commit
 	tree, err := c.Tree()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading commit tree: %w", err)
 	}
 
 	// For the first commit, list all files in the tree
@@ -201,24 +151,27 @@ func getCommitFiles(c *object.Commit) ([]string, error) {
 			files = append(files, f.Name)
 			return nil
 		})
-		return files, err
+		if err != nil {
+			return nil, fmt.Errorf("listing tree files: %w", err)
+		}
+		return files, nil
 	}
 
 	// Get parent commit for diff
 	parent, err := c.Parent(0)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading parent commit: %w", err)
 	}
 
 	parentTree, err := parent.Tree()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading parent tree: %w", err)
 	}
 
 	// Get changes between parent and this commit
 	changes, err := parentTree.Diff(tree)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("computing tree diff: %w", err)
 	}
 
 	for _, change := range changes {

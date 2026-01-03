@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	indexDir = ".git/semantic-index"
-	dbFile   = "embeddings.db"
+	indexDir            = ".git/semantic-index"
+	dbFile              = "embeddings.db"
+	IndexDirPermissions = 0755
 )
 
 // SQLiteStore implements Store using SQLite for persistence.
@@ -28,20 +29,20 @@ type SQLiteStore struct {
 // repoPath should be the root of the git repository.
 func NewSQLiteStore(repoPath string) (*SQLiteStore, error) {
 	indexPath := filepath.Join(repoPath, indexDir)
-	if err := os.MkdirAll(indexPath, 0755); err != nil {
-		return nil, err
+	if err := os.MkdirAll(indexPath, IndexDirPermissions); err != nil {
+		return nil, fmt.Errorf("creating index directory: %w", err)
 	}
 
 	dbPath := filepath.Join(indexPath, dbFile)
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
 	store := &SQLiteStore{db: db, path: dbPath}
 	if err := store.initSchema(); err != nil {
 		db.Close()
-		return nil, err
+		return nil, fmt.Errorf("initializing schema: %w", err)
 	}
 
 	return store, nil
@@ -63,7 +64,10 @@ func (s *SQLiteStore) initSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_commits_date ON commits(date);
 	`
 	_, err := s.db.Exec(schema)
-	return err
+	if err != nil {
+		return fmt.Errorf("executing schema: %w", err)
+	}
+	return nil
 }
 
 // Save stores a single commit with its embedding.
@@ -97,7 +101,7 @@ func (s *SQLiteStore) SaveBatch(commits []git.Commit, embeddings [][]float32) er
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
-		return err
+		return fmt.Errorf("preparing insert statement: %w", err)
 	}
 	defer stmt.Close()
 
@@ -160,7 +164,7 @@ func (s *SQLiteStore) Search(queryVec []float32, limit int, filters SearchFilter
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("executing search query: %w", err)
 	}
 	defer rows.Close()
 

@@ -15,6 +15,20 @@ import (
 	"github.com/user/git-seek/internal/store"
 )
 
+// Configuration constants
+const (
+	DefaultBatchSize      = 100  // Batch size for embedding generation
+	DefaultSearchLimit    = 10   // Default max search results
+	DebugSampleLimit      = 5    // Commits shown in debug mode
+	ProgressBarWidth      = 40   // Width of progress bar display
+	MaxFilesDisplay       = 3    // Max files shown before truncation
+	HoursPerDay           = 24
+	ApproxDaysPerMonth    = 30
+	ApproxDaysPerYear     = 365
+	NumberFormatThreshold = 1000
+	CommaGroupSize        = 3
+)
+
 // Version information (set via SetVersionInfo from main)
 var (
 	version = "dev"
@@ -111,17 +125,26 @@ Examples:
 
 		if debugFlag {
 			git.Debug = true
-			runDebug()
+			if err := runDebug(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
 			return
 		}
 
 		if embedTestFlag {
-			runEmbedTest()
+			if err := runEmbedTest(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
 			return
 		}
 
 		if storeTestFlag {
-			runStoreTest()
+			if err := runStoreTest(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
 			return
 		}
 
@@ -168,10 +191,10 @@ func init() {
 	rootCmd.Flags().BoolVar(&storeTestFlag, "store-test", false, "Test vector storage and search")
 	rootCmd.Flags().BoolVar(&indexFlag, "index", false, "Build/update semantic index")
 	rootCmd.Flags().BoolVar(&statusFlag, "status", false, "Show index information")
-	rootCmd.Flags().IntVar(&batchSize, "batch-size", 100, "Batch size for embedding generation")
+	rootCmd.Flags().IntVar(&batchSize, "batch-size", DefaultBatchSize, "Batch size for embedding generation")
 
 	// Search flags
-	rootCmd.Flags().IntVarP(&limitFlag, "limit", "n", 10, "Maximum number of results")
+	rootCmd.Flags().IntVarP(&limitFlag, "limit", "n", DefaultSearchLimit, "Maximum number of results")
 	rootCmd.Flags().BoolVar(&jsonFlag, "json", false, "Output results as JSON")
 	rootCmd.Flags().BoolVar(&shortFlag, "short", false, "Output only commit hashes")
 
@@ -183,33 +206,30 @@ func init() {
 	rootCmd.Flags().StringVar(&branchFilter, "branch", "", "Filter by branch name")
 }
 
-func runDebug() {
+func runDebug() error {
 	cwd, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting current directory: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("getting current directory: %w", err)
 	}
 
 	fmt.Printf("Opening repository at: %s\n", cwd)
 
 	repo, err := git.OpenRepository(cwd)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error opening repository: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("opening repository: %w", err)
 	}
 
 	fmt.Println("Fetching commits...")
 
-	commits, err := git.GetAllCommits(repo)
+	commits, err := git.GetCommits(repo, "")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting commits: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("getting commits: %w", err)
 	}
 
 	fmt.Printf("\nFound %d commits\n\n", len(commits))
 
-	// Show first 5 commits as sample
-	limit := 5
+	// Show first few commits as sample
+	limit := DebugSampleLimit
 	if len(commits) < limit {
 		limit = len(commits)
 	}
@@ -233,15 +253,16 @@ func runDebug() {
 	if len(commits) > limit {
 		fmt.Printf("... and %d more commits\n", len(commits)-limit)
 	}
+
+	return nil
 }
 
-func runEmbedTest() {
+func runEmbedTest() error {
 	fmt.Println("Initializing MiniLM embedder...")
 
 	embedder, err := embedding.NewMiniLMEmbedder()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating embedder: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("creating embedder: %w", err)
 	}
 	defer embedder.Close()
 
@@ -280,28 +301,27 @@ func runEmbedTest() {
 
 	fmt.Printf("\n  \"Fix authentication bug\" vs \"Fix login issue\": %.4f\n", sim12)
 	fmt.Printf("  \"Fix authentication bug\" vs \"Update documentation\": %.4f\n", sim13)
+
+	return nil
 }
 
-func runStoreTest() {
+func runStoreTest() error {
 	cwd, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting current directory: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("getting current directory: %w", err)
 	}
 
 	fmt.Println("Initializing store...")
 	s, err := store.NewSQLiteStore(cwd)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating store: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("creating store: %w", err)
 	}
 	defer s.Close()
 
 	fmt.Println("Initializing embedder...")
 	embedder, err := embedding.NewMiniLMEmbedder()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating embedder: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("creating embedder: %w", err)
 	}
 	defer embedder.Close()
 
@@ -309,14 +329,12 @@ func runStoreTest() {
 	fmt.Println("Fetching commits...")
 	repo, err := git.OpenRepository(cwd)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error opening repository: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("opening repository: %w", err)
 	}
 
-	commits, err := git.GetAllCommits(repo)
+	commits, err := git.GetCommits(repo, "")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting commits: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("getting commits: %w", err)
 	}
 
 	fmt.Printf("Found %d commits\n", len(commits))
@@ -330,16 +348,14 @@ func runStoreTest() {
 
 	embeddings, err := embedder.EmbedBatch(messages)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error generating embeddings: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("generating embeddings: %w", err)
 	}
 
 	// Save to store
 	fmt.Println("Saving to store...")
 	err = s.SaveBatch(commits, embeddings)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error saving to store: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("saving to store: %w", err)
 	}
 
 	count, _ := s.Count()
@@ -354,20 +370,20 @@ func runStoreTest() {
 
 	queryVec, err := embedder.Embed(query)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error embedding query: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("embedding query: %w", err)
 	}
 
-	results, err := s.Search(queryVec, 5, store.SearchFilters{})
+	results, err := s.Search(queryVec, DebugSampleLimit, store.SearchFilters{})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error searching: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("searching: %w", err)
 	}
 
 	fmt.Printf("Found %d results:\n\n", len(results))
 	for _, r := range results {
 		fmt.Printf("  %.4f  %s  %s\n", r.Score, r.Commit.ShortHash(), r.Commit.Message)
 	}
+
+	return nil
 }
 
 func runIndex() error {
@@ -375,7 +391,7 @@ func runIndex() error {
 
 	ctx, err := newAppContext()
 	if err != nil {
-		return err
+		return fmt.Errorf("initializing app context: %w", err)
 	}
 	defer ctx.Close()
 
@@ -391,7 +407,7 @@ func runIndex() error {
 
 	if err == nil && lastHash != "" {
 		// Incremental: only new commits
-		commits, err = git.GetCommitsSince(repo, lastHash)
+		commits, err = git.GetCommits(repo, lastHash)
 		if err != nil {
 			return fmt.Errorf("getting commits since %s: %w", lastHash, err)
 		}
@@ -402,7 +418,7 @@ func runIndex() error {
 		fmt.Printf("Found %d new commits to index\n", len(commits))
 	} else {
 		// Full index
-		commits, err = git.GetAllCommits(repo)
+		commits, err = git.GetCommits(repo, "")
 		if err != nil {
 			return fmt.Errorf("getting commits: %w", err)
 		}
@@ -413,7 +429,7 @@ func runIndex() error {
 	bar := progressbar.NewOptions(len(commits),
 		progressbar.OptionSetDescription("Embedding commits"),
 		progressbar.OptionShowCount(),
-		progressbar.OptionSetWidth(40),
+		progressbar.OptionSetWidth(ProgressBarWidth),
 		progressbar.OptionClearOnFinish(),
 	)
 
@@ -474,7 +490,7 @@ func runSearch(query string) error {
 
 	ctx, err := newAppContext()
 	if err != nil {
-		return err
+		return fmt.Errorf("initializing app context: %w", err)
 	}
 	defer ctx.Close()
 
@@ -499,13 +515,13 @@ func runSearch(query string) error {
 	if sinceFilter != "" {
 		filters.Since, err = parseDate(sinceFilter)
 		if err != nil {
-			return err
+			return fmt.Errorf("parsing --since date: %w", err)
 		}
 	}
 	if untilFilter != "" {
 		filters.Until, err = parseDate(untilFilter)
 		if err != nil {
-			return err
+			return fmt.Errorf("parsing --until date: %w", err)
 		}
 	}
 
@@ -575,8 +591,8 @@ func printResult(r store.SearchResult) {
 	// Line 3: files (truncated if many)
 	if len(r.Commit.Files) > 0 {
 		files := r.Commit.Files
-		if len(files) > 3 {
-			files = append(files[:3], fmt.Sprintf("(+%d more)", len(r.Commit.Files)-3))
+		if len(files) > MaxFilesDisplay {
+			files = append(files[:MaxFilesDisplay], fmt.Sprintf("(+%d more)", len(r.Commit.Files)-MaxFilesDisplay))
 		}
 		fmt.Printf("         %s\n", strings.Join(files, ", "))
 	}
@@ -596,26 +612,26 @@ func relativeTime(t time.Time) string {
 			return "1 minute ago"
 		}
 		return fmt.Sprintf("%d minutes ago", mins)
-	case diff < 24*time.Hour:
+	case diff < HoursPerDay*time.Hour:
 		hours := int(diff.Hours())
 		if hours == 1 {
 			return "1 hour ago"
 		}
 		return fmt.Sprintf("%d hours ago", hours)
-	case diff < 30*24*time.Hour:
-		days := int(diff.Hours() / 24)
+	case diff < ApproxDaysPerMonth*HoursPerDay*time.Hour:
+		days := int(diff.Hours() / HoursPerDay)
 		if days == 1 {
 			return "1 day ago"
 		}
 		return fmt.Sprintf("%d days ago", days)
-	case diff < 365*24*time.Hour:
-		months := int(diff.Hours() / 24 / 30)
+	case diff < ApproxDaysPerYear*HoursPerDay*time.Hour:
+		months := int(diff.Hours() / HoursPerDay / ApproxDaysPerMonth)
 		if months == 1 {
 			return "1 month ago"
 		}
 		return fmt.Sprintf("%d months ago", months)
 	default:
-		years := int(diff.Hours() / 24 / 365)
+		years := int(diff.Hours() / HoursPerDay / ApproxDaysPerYear)
 		if years == 1 {
 			return "1 year ago"
 		}
@@ -681,7 +697,7 @@ func formatSize(bytes int64) string {
 }
 
 func formatNumber(n int) string {
-	if n < 1000 {
+	if n < NumberFormatThreshold {
 		return fmt.Sprintf("%d", n)
 	}
 
@@ -689,7 +705,7 @@ func formatNumber(n int) string {
 	s := fmt.Sprintf("%d", n)
 	var result strings.Builder
 	for i, c := range s {
-		if i > 0 && (len(s)-i)%3 == 0 {
+		if i > 0 && (len(s)-i)%CommaGroupSize == 0 {
 			result.WriteRune(',')
 		}
 		result.WriteRune(c)

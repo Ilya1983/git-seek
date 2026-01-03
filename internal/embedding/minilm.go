@@ -1,6 +1,8 @@
 package embedding
 
 import (
+	"fmt"
+
 	"github.com/clems4ever/all-minilm-l6-v2-go/all_minilm_l6_v2"
 )
 
@@ -16,7 +18,7 @@ type MiniLMEmbedder struct {
 func NewMiniLMEmbedder() (*MiniLMEmbedder, error) {
 	model, err := all_minilm_l6_v2.NewModel()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("loading MiniLM model: %w", err)
 	}
 	return &MiniLMEmbedder{model: model}, nil
 }
