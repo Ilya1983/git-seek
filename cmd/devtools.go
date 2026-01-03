@@ -93,7 +93,7 @@ func runStoreTest() error {
 		return fmt.Errorf("opening repository: %w", err)
 	}
 
-	commits, err := git.GetCommits(repo, "")
+	commits, err := git.GetCommits(repo, "", false) // Store test always gets files
 	if err != nil {
 		return fmt.Errorf("getting commits: %w", err)
 	}

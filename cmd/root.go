@@ -61,6 +61,9 @@ var untilFilter string
 var pathFilter string
 var branchFilter string
 
+// Indexing flags
+var skipFilesFlag bool
+
 // appContext holds initialized components for commands
 type appContext struct {
 	cwd      string
@@ -188,6 +191,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&indexFlag, "index", false, "Build/update semantic index")
 	rootCmd.Flags().BoolVar(&statusFlag, "status", false, "Show index information")
 	rootCmd.Flags().IntVar(&batchSize, "batch-size", DefaultBatchSize, "Batch size for embedding generation")
+	rootCmd.Flags().BoolVar(&skipFilesFlag, "skip-files", false, "Skip file extraction during indexing (faster, but --path filter won't work)")
 
 	// Search flags
 	rootCmd.Flags().IntVarP(&limitFlag, "limit", "n", DefaultSearchLimit, "Maximum number of results")
@@ -217,7 +221,7 @@ func runDebug() error {
 
 	fmt.Println("Fetching commits...")
 
-	commits, err := git.GetCommits(repo, "")
+	commits, err := git.GetCommits(repo, "", false) // Debug always gets files
 	if err != nil {
 		return fmt.Errorf("getting commits: %w", err)
 	}
@@ -274,7 +278,7 @@ func runIndex() error {
 
 	if err == nil && lastHash != "" {
 		// Incremental: only new commits
-		commits, err = git.GetCommits(repo, lastHash)
+		commits, err = git.GetCommits(repo, lastHash, skipFilesFlag)
 		if err != nil {
 			return fmt.Errorf("getting commits since %s: %w", lastHash, err)
 		}
@@ -283,13 +287,19 @@ func runIndex() error {
 			return nil
 		}
 		fmt.Printf("Found %d new commits to index\n", len(commits))
+		if skipFilesFlag {
+			fmt.Println("(skipping file extraction for faster indexing)")
+		}
 	} else {
 		// Full index
-		commits, err = git.GetCommits(repo, "")
+		commits, err = git.GetCommits(repo, "", skipFilesFlag)
 		if err != nil {
 			return fmt.Errorf("getting commits: %w", err)
 		}
 		fmt.Printf("Indexing %d commits\n", len(commits))
+		if skipFilesFlag {
+			fmt.Println("(skipping file extraction for faster indexing)")
+		}
 	}
 
 	// Progress bar
@@ -365,6 +375,11 @@ func runSearch(query string) error {
 	count, err := ctx.store.Count()
 	if err != nil || count == 0 {
 		return fmt.Errorf("no index found. Run 'git-seek --index' first")
+	}
+
+	// Warn if --path filter is used (may not work with --skip-files index)
+	if pathFilter != "" {
+		fmt.Fprintln(os.Stderr, "Warning: --path filter may not work if index was built with --skip-files")
 	}
 
 	// Embed query

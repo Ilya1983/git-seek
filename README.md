@@ -83,6 +83,51 @@ $env:ONNXRUNTIME_LIB_PATH = "$(pwd)\lib\onnxruntime.dll"
 .\git-seek.exe --help
 ```
 
+### Run from Any Directory (Optional)
+
+If you want to use `git-seek` from any folder, you need to set up permanent environment variables with **absolute paths**.
+
+**Linux:**
+```bash
+# Add to ~/.bashrc (adjust path to where you extracted git-seek)
+export PATH="/path/to/git-seek-linux-x64-v1.0.0:$PATH"
+export LD_LIBRARY_PATH="/path/to/git-seek-linux-x64-v1.0.0/lib:$LD_LIBRARY_PATH"
+export ONNXRUNTIME_LIB_PATH="/path/to/git-seek-linux-x64-v1.0.0/lib/libonnxruntime.so"
+
+# Reload shell config
+source ~/.bashrc
+
+# Now works from any directory
+git-seek --help
+```
+
+**macOS:**
+```bash
+# Add to ~/.zshrc (adjust path to where you extracted git-seek)
+export PATH="/path/to/git-seek-osx-arm64-v1.0.0:$PATH"
+export DYLD_LIBRARY_PATH="/path/to/git-seek-osx-arm64-v1.0.0/lib:$DYLD_LIBRARY_PATH"
+export ONNXRUNTIME_LIB_PATH="/path/to/git-seek-osx-arm64-v1.0.0/lib/libonnxruntime.dylib"
+
+# Reload shell config
+source ~/.zshrc
+
+# Now works from any directory
+git-seek --help
+```
+
+**Windows (PowerShell as Administrator):**
+```powershell
+# Set permanent environment variables (adjust path to where you extracted git-seek)
+$installPath = "C:\path\to\git-seek-win-x64-v1.0.0"
+[Environment]::SetEnvironmentVariable("Path", "$installPath;$installPath\lib;$env:Path", "Machine")
+[Environment]::SetEnvironmentVariable("ONNXRUNTIME_LIB_PATH", "$installPath\lib\onnxruntime.dll", "Machine")
+
+# Restart PowerShell, then run from any directory (without .\ prefix)
+git-seek --help
+```
+
+> **Windows Note:** When running from PATH, use `git-seek` not `.\git-seek.exe`. The `.\` prefix only looks in the current directory.
+
 ### Build from Source
 
 **Prerequisites:**

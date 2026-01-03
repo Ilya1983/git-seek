@@ -49,8 +49,9 @@ func OpenRepository(path string) (*git.Repository, error) {
 // GetCommits retrieves commits from the repository.
 // If sinceHash is empty, returns all commits.
 // If sinceHash is provided, returns only commits newer than that hash.
+// If skipFiles is true, skips the expensive file extraction (faster indexing).
 // Returns commits in reverse chronological order (newest first).
-func GetCommits(repo *git.Repository, sinceHash string) ([]Commit, error) {
+func GetCommits(repo *git.Repository, sinceHash string, skipFiles bool) ([]Commit, error) {
 	// Build a map of commit hash -> branches for quick lookup
 	branchMap, err := buildBranchMap(repo)
 	if err != nil {
@@ -78,12 +79,16 @@ func GetCommits(repo *git.Repository, sinceHash string) ([]Commit, error) {
 			return storer.ErrStop
 		}
 
-		files, err := getCommitFiles(c)
-		if err != nil {
-			if Debug {
-				fmt.Fprintf(os.Stderr, "Warning: failed to get files for %s: %v\n", shortHash, err)
+		var files []string
+		if !skipFiles {
+			var err error
+			files, err = getCommitFiles(c)
+			if err != nil {
+				if Debug {
+					fmt.Fprintf(os.Stderr, "Warning: failed to get files for %s: %v\n", shortHash, err)
+				}
+				files = []string{}
 			}
-			files = []string{}
 		}
 
 		commit := Commit{
