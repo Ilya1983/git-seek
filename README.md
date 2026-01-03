@@ -317,6 +317,10 @@ git-seek "changes" --limit=20  # Top 20 results
 | `-n, --limit=<N>` | Maximum results (default: 10) |
 | `--json` | Output as JSON |
 | `--short` | Output hashes only |
+| `--batch-size=<N>` | Batch size for embedding generation (default: 100) |
+| `--max-files=<N>` | Maximum files shown per result (default: 3) |
+| `--hash-length=<N>` | Commit hash display length, 7-40 (default: 7) |
+| `--progress-width=<N>` | Progress bar width (default: 40) |
 | `--help` | Show help |
 
 **Developer/Debug Flags:**
@@ -324,6 +328,7 @@ git-seek "changes" --limit=20  # Top 20 results
 | Flag | Description |
 |------|-------------|
 | `--debug` | Show commit extraction info |
+| `--debug-limit=<N>` | Commits shown in debug mode (default: 5) |
 | `--embed-test` | Test embedding model initialization and similarity |
 | `--store-test` | Test vector storage and search functionality |
 
