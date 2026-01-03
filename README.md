@@ -43,10 +43,10 @@ Download the latest release for your platform from the [Releases page](https://g
 
 **Linux (x64):**
 ```bash
-# Replace v1.0.0 with the latest version
-curl -LO https://github.com/Ilya1983/git-seek/releases/download/v1.0.0/git-seek-linux-x64-v1.0.0.tar.gz
-tar -xzf git-seek-linux-x64-v1.0.0.tar.gz
-cd git-seek-linux-x64-v1.0.0
+# Replace v1.1.0 with the latest version
+curl -LO https://github.com/Ilya1983/git-seek/releases/download/v1.1.0/git-seek-linux-x64-v1.1.0.tar.gz
+tar -xzf git-seek-linux-x64-v1.1.0.tar.gz
+cd git-seek-linux-x64-v1.1.0
 
 # Set environment (add to ~/.bashrc for persistence)
 export LD_LIBRARY_PATH=$(pwd)/lib:$LD_LIBRARY_PATH
@@ -57,10 +57,10 @@ export ONNXRUNTIME_LIB_PATH=$(pwd)/lib/libonnxruntime.so
 
 **macOS (Apple Silicon):**
 ```bash
-# Replace v1.0.0 with the latest version
-curl -LO https://github.com/Ilya1983/git-seek/releases/download/v1.0.0/git-seek-osx-arm64-v1.0.0.tar.gz
-tar -xzf git-seek-osx-arm64-v1.0.0.tar.gz
-cd git-seek-osx-arm64-v1.0.0
+# Replace v1.1.0 with the latest version
+curl -LO https://github.com/Ilya1983/git-seek/releases/download/v1.1.0/git-seek-osx-arm64-v1.1.0.tar.gz
+tar -xzf git-seek-osx-arm64-v1.1.0.tar.gz
+cd git-seek-osx-arm64-v1.1.0
 
 # Set environment (add to ~/.zshrc for persistence)
 export DYLD_LIBRARY_PATH=$(pwd)/lib:$DYLD_LIBRARY_PATH
@@ -71,10 +71,10 @@ export ONNXRUNTIME_LIB_PATH=$(pwd)/lib/libonnxruntime.dylib
 
 **Windows (x64):**
 ```powershell
-# Replace v1.0.0 with the latest version
-Invoke-WebRequest -Uri "https://github.com/Ilya1983/git-seek/releases/download/v1.0.0/git-seek-win-x64-v1.0.0.zip" -OutFile "git-seek-win-x64-v1.0.0.zip"
-Expand-Archive -Path "git-seek-win-x64-v1.0.0.zip" -DestinationPath "."
-cd git-seek-win-x64-v1.0.0
+# Replace v1.1.0 with the latest version
+Invoke-WebRequest -Uri "https://github.com/Ilya1983/git-seek/releases/download/v1.1.0/git-seek-win-x64-v1.1.0.zip" -OutFile "git-seek-win-x64-v1.1.0.zip"
+Expand-Archive -Path "git-seek-win-x64-v1.1.0.zip" -DestinationPath "."
+cd git-seek-win-x64-v1.1.0
 
 # Set environment (for current session)
 $env:PATH = "$(pwd)\lib;$env:PATH"
@@ -90,9 +90,9 @@ If you want to use `git-seek` from any folder, you need to set up permanent envi
 **Linux:**
 ```bash
 # Add to ~/.bashrc (adjust path to where you extracted git-seek)
-export PATH="/path/to/git-seek-linux-x64-v1.0.0:$PATH"
-export LD_LIBRARY_PATH="/path/to/git-seek-linux-x64-v1.0.0/lib:$LD_LIBRARY_PATH"
-export ONNXRUNTIME_LIB_PATH="/path/to/git-seek-linux-x64-v1.0.0/lib/libonnxruntime.so"
+export PATH="/path/to/git-seek-linux-x64-v1.1.0:$PATH"
+export LD_LIBRARY_PATH="/path/to/git-seek-linux-x64-v1.1.0/lib:$LD_LIBRARY_PATH"
+export ONNXRUNTIME_LIB_PATH="/path/to/git-seek-linux-x64-v1.1.0/lib/libonnxruntime.so"
 
 # Reload shell config
 source ~/.bashrc
@@ -104,9 +104,9 @@ git-seek --help
 **macOS:**
 ```bash
 # Add to ~/.zshrc (adjust path to where you extracted git-seek)
-export PATH="/path/to/git-seek-osx-arm64-v1.0.0:$PATH"
-export DYLD_LIBRARY_PATH="/path/to/git-seek-osx-arm64-v1.0.0/lib:$DYLD_LIBRARY_PATH"
-export ONNXRUNTIME_LIB_PATH="/path/to/git-seek-osx-arm64-v1.0.0/lib/libonnxruntime.dylib"
+export PATH="/path/to/git-seek-osx-arm64-v1.1.0:$PATH"
+export DYLD_LIBRARY_PATH="/path/to/git-seek-osx-arm64-v1.1.0/lib:$DYLD_LIBRARY_PATH"
+export ONNXRUNTIME_LIB_PATH="/path/to/git-seek-osx-arm64-v1.1.0/lib/libonnxruntime.dylib"
 
 # Reload shell config
 source ~/.zshrc
@@ -118,7 +118,7 @@ git-seek --help
 **Windows (PowerShell as Administrator):**
 ```powershell
 # Set permanent environment variables (adjust path to where you extracted git-seek)
-$installPath = "C:\path\to\git-seek-win-x64-v1.0.0"
+$installPath = "C:\path\to\git-seek-win-x64-v1.1.0"
 [Environment]::SetEnvironmentVariable("Path", "$installPath;$installPath\lib;$env:Path", "Machine")
 [Environment]::SetEnvironmentVariable("ONNXRUNTIME_LIB_PATH", "$installPath\lib\onnxruntime.dll", "Machine")
 
@@ -171,6 +171,16 @@ git-seek --index
 ```
 
 This walks through all commits, generates semantic embeddings for each commit message, and stores them locally. Progress is shown for large repositories.
+
+**Fast indexing for large repositories:**
+
+For repositories with 50K+ commits, use `--skip-files` to skip the expensive file extraction:
+
+```bash
+git-seek --index --skip-files
+```
+
+This is significantly faster but the `--path` filter won't work since file data isn't collected.
 
 **Index location:** `.git/semantic-index/embeddings.db`
 
@@ -297,6 +307,7 @@ git-seek "changes" --limit=20  # Top 20 results
 |------|-------------|
 | `--version` | Show version information |
 | `--index` | Build or update the semantic index |
+| `--skip-files` | Skip file extraction during indexing (faster, but `--path` filter won't work) |
 | `--status` | Show index information |
 | `--author=<name>` | Filter by author name or email (substring) |
 | `--since=<date>` | Show commits after date (YYYY-MM-DD) |
@@ -415,6 +426,15 @@ git-seek "changes" --path="internal/*/*.go"
 
 # Does NOT work
 git-seek "changes" --path="**/*.go"
+```
+
+### Path filter returns no results (indexed with --skip-files)
+
+If you indexed with `--skip-files`, the `--path` filter won't work because file data wasn't collected. Re-index without the flag:
+
+```bash
+rm -rf .git/semantic-index
+git-seek --index
 ```
 
 ## Contributing
