@@ -64,6 +64,12 @@ var branchFilter string
 // Indexing flags
 var skipFilesFlag bool
 
+// Display customization flags
+var maxFilesFlag int
+var hashLengthFlag int
+var debugLimitFlag int
+var progressWidthFlag int
+
 // appContext holds initialized components for commands
 type appContext struct {
 	cwd      string
@@ -119,6 +125,27 @@ Examples:
   git-seek "authentication changes" --author=alice
   git-seek --index`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Validate display customization flags
+		if hashLengthFlag < 7 || hashLengthFlag > 40 {
+			fmt.Fprintln(os.Stderr, "Error: --hash-length must be between 7 and 40")
+			os.Exit(1)
+		}
+		if maxFilesFlag < 0 {
+			fmt.Fprintln(os.Stderr, "Error: --max-files must be non-negative")
+			os.Exit(1)
+		}
+		if debugLimitFlag < 1 {
+			fmt.Fprintln(os.Stderr, "Error: --debug-limit must be at least 1")
+			os.Exit(1)
+		}
+		if progressWidthFlag < 10 {
+			fmt.Fprintln(os.Stderr, "Error: --progress-width must be at least 10")
+			os.Exit(1)
+		}
+
+		// Apply hash length setting
+		git.SetShortHashLength(hashLengthFlag)
+
 		if versionFlag {
 			fmt.Printf("git-seek %s (commit: %s, built: %s)\n", version, commit, date)
 			return
@@ -204,6 +231,12 @@ func init() {
 	rootCmd.Flags().StringVar(&untilFilter, "until", "", "Show commits before date (YYYY-MM-DD)")
 	rootCmd.Flags().StringVar(&pathFilter, "path", "", "Filter by file path (glob pattern)")
 	rootCmd.Flags().StringVar(&branchFilter, "branch", "", "Filter by branch name")
+
+	// Display customization flags
+	rootCmd.Flags().IntVar(&maxFilesFlag, "max-files", MaxFilesDisplay, "Maximum files shown per result")
+	rootCmd.Flags().IntVar(&hashLengthFlag, "hash-length", git.ShortHashLength, "Commit hash display length (7-40)")
+	rootCmd.Flags().IntVar(&debugLimitFlag, "debug-limit", DebugSampleLimit, "Number of commits shown in --debug mode")
+	rootCmd.Flags().IntVar(&progressWidthFlag, "progress-width", ProgressBarWidth, "Progress bar width")
 }
 
 func runDebug() error {
@@ -229,7 +262,7 @@ func runDebug() error {
 	fmt.Printf("\nFound %d commits\n\n", len(commits))
 
 	// Show first few commits as sample
-	limit := DebugSampleLimit
+	limit := debugLimitFlag
 	if len(commits) < limit {
 		limit = len(commits)
 	}
@@ -306,7 +339,7 @@ func runIndex() error {
 	bar := progressbar.NewOptions(len(commits),
 		progressbar.OptionSetDescription("Embedding commits"),
 		progressbar.OptionShowCount(),
-		progressbar.OptionSetWidth(ProgressBarWidth),
+		progressbar.OptionSetWidth(progressWidthFlag),
 		progressbar.OptionClearOnFinish(),
 	)
 
@@ -473,8 +506,8 @@ func printResult(r store.SearchResult) {
 	// Line 3: files (truncated if many)
 	if len(r.Commit.Files) > 0 {
 		files := r.Commit.Files
-		if len(files) > MaxFilesDisplay {
-			files = append(files[:MaxFilesDisplay], fmt.Sprintf("(+%d more)", len(r.Commit.Files)-MaxFilesDisplay))
+		if len(files) > maxFilesFlag {
+			files = append(files[:maxFilesFlag], fmt.Sprintf("(+%d more)", len(r.Commit.Files)-maxFilesFlag))
 		}
 		fmt.Printf("         %s\n", strings.Join(files, ", "))
 	}

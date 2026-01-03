@@ -15,7 +15,15 @@ import (
 var Debug bool
 
 // ShortHashLength is the number of characters used for abbreviated commit hashes.
-const ShortHashLength = 7
+// Can be changed via SetShortHashLength for customization.
+var ShortHashLength = 7
+
+// SetShortHashLength sets the hash display length (must be 7-40).
+func SetShortHashLength(n int) {
+	if n >= 7 && n <= 40 {
+		ShortHashLength = n
+	}
+}
 
 // ShortenHash returns the first ShortHashLength characters of a hash string.
 func ShortenHash(hash string) string {
