@@ -7,6 +7,17 @@
 *.dll
 *.so
 *.dylib
+git-seek
+
+# Build dependencies and artifacts (created by Makefile/build.ps1)
+deps/
+dist/
+
+# Legacy ONNX Runtime location (before Makefile)
+onnxruntime-linux-x64-*/
+
+# Model file (downloaded during build, 87MB)
+patches/all-minilm-l6-v2-go/all_minilm_l6_v2/model.onnx
 
 # Test binary, built with `go test -c`
 *.test
@@ -29,4 +40,12 @@ go.work.sum
 
 # Editor/IDE
 # .idea/
+
 # .vscode/
+
+CLAUDE.md
+.devcontainer/
+./claude
+/issues
+/sessions
+/code-reviews
