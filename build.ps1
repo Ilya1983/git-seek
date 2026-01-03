@@ -98,6 +98,7 @@ $DIST_DIR = "dist"
 # Model settings (all-MiniLM-L6-v2 for embeddings)
 $MODEL_URL = "https://media.githubusercontent.com/media/clems4ever/all-minilm-l6-v2-go/main/all_minilm_l6_v2/model.onnx"
 $MODEL_FILE = "patches\all-minilm-l6-v2-go\all_minilm_l6_v2\model.onnx"
+$MODEL_SHA256 = "994a58868f7abacacbf2192aa0aae8f56da8c4505dbde2740c861b24426ede6b"
 
 # Build output
 $BINARY = "$PROJECT_NAME.exe"
@@ -154,7 +155,18 @@ function Download-Model {
         exit 1
     }
 
-    Write-Success "Model downloaded to $MODEL_FILE"
+    # Verify checksum
+    Write-Host "Verifying model checksum..."
+    $actualHash = (Get-FileHash -Path $MODEL_FILE -Algorithm SHA256).Hash.ToLower()
+    if ($actualHash -ne $MODEL_SHA256) {
+        Remove-Item $MODEL_FILE -Force
+        Write-Error "Model checksum verification failed!"
+        Write-Error "Expected: $MODEL_SHA256"
+        Write-Error "Got:      $actualHash"
+        exit 1
+    }
+
+    Write-Success "Model downloaded and verified: $MODEL_FILE"
 }
 
 #==============================================================================

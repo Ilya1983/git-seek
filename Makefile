@@ -39,6 +39,7 @@ ORT_SHA256_osx-arm64 :=
 # Model settings (all-MiniLM-L6-v2 for embeddings)
 MODEL_URL := https://media.githubusercontent.com/media/clems4ever/all-minilm-l6-v2-go/main/all_minilm_l6_v2/model.onnx
 MODEL_FILE := patches/all-minilm-l6-v2-go/all_minilm_l6_v2/model.onnx
+MODEL_SHA256 := 994a58868f7abacacbf2192aa0aae8f56da8c4505dbde2740c861b24426ede6b
 
 # Directory structure
 DEPS_DIR := deps
@@ -189,7 +190,9 @@ $(MODEL_FILE):
 	@echo "Downloading all-MiniLM-L6-v2 model (~90MB)..."
 	@mkdir -p $(dir $(MODEL_FILE))
 	@curl -fsSL --progress-bar -o $(MODEL_FILE) $(MODEL_URL)
-	@echo "Model downloaded to $(MODEL_FILE)"
+	@echo "Verifying model checksum..."
+	@echo "$(MODEL_SHA256)  $(MODEL_FILE)" | sha256sum -c - || (rm -f $(MODEL_FILE) && echo "ERROR: Model checksum verification failed!" && exit 1)
+	@echo "Model downloaded and verified: $(MODEL_FILE)"
 
 .PHONY: setup check-deps
 setup: $(ORT_LIB_FILE) $(MODEL_FILE) ## Download ONNX Runtime and model for current platform
