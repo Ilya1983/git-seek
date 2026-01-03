@@ -191,7 +191,11 @@ $(MODEL_FILE):
 	@mkdir -p $(dir $(MODEL_FILE))
 	@curl -fsSL --progress-bar -o $(MODEL_FILE) $(MODEL_URL)
 	@echo "Verifying model checksum..."
-	@echo "$(MODEL_SHA256)  $(MODEL_FILE)" | sha256sum -c - || (rm -f $(MODEL_FILE) && echo "ERROR: Model checksum verification failed!" && exit 1)
+	@if command -v sha256sum >/dev/null 2>&1; then \
+		echo "$(MODEL_SHA256)  $(MODEL_FILE)" | sha256sum -c - || (rm -f $(MODEL_FILE) && echo "ERROR: Model checksum verification failed!" && exit 1); \
+	else \
+		echo "$(MODEL_SHA256)  $(MODEL_FILE)" | shasum -a 256 -c - || (rm -f $(MODEL_FILE) && echo "ERROR: Model checksum verification failed!" && exit 1); \
+	fi
 	@echo "Model downloaded and verified: $(MODEL_FILE)"
 
 .PHONY: setup check-deps
